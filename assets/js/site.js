@@ -206,3 +206,21 @@
   var heroEm = document.querySelector('.hero h1 em');
   if (heroEm && !reduce) { heroEm.addEventListener('animationend', function () { heroEm.classList.remove('fx-glitch-once'); }); setTimeout(function () { heroEm.classList.add('fx-glitch-once'); }, 400); }
 })();
+
+/* 표 가로 스크롤 끝 페이드: 더 볼 내용이 있을 때만 오른쪽에 페이드 표시 */
+(function () {
+  var wraps = document.querySelectorAll('.table-wrap > .table-scroll');
+  if (!wraps.length) return;
+  function update(sc) {
+    var more = sc.scrollWidth - sc.clientWidth - sc.scrollLeft > 4;
+    sc.parentNode.classList.toggle('has-more', more);
+  }
+  wraps.forEach(function (sc) {
+    update(sc);
+    sc.addEventListener('scroll', function () { update(sc); }, { passive: true });
+  });
+  var t;
+  window.addEventListener('resize', function () {
+    clearTimeout(t); t = setTimeout(function () { wraps.forEach(update); }, 120);
+  }, { passive: true });
+})();
