@@ -204,5 +204,5 @@
   }
   /* 히어로 강조 문구: 로드 직후 한 번 디코드 */
   var heroEm = document.querySelector('.hero h1 em');
-  if (heroEm && !reduce) setTimeout(function () { heroEm.classList.add('fx-glitch-once'); }, 400);
+  if (heroEm && !reduce) { heroEm.addEventListener('animationend', function () { heroEm.classList.remove('fx-glitch-once'); }); setTimeout(function () { heroEm.classList.add('fx-glitch-once'); }, 400); }
 })();
