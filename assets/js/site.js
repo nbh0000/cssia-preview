@@ -61,4 +61,40 @@
       list.querySelectorAll('details[open]').forEach(function (o) { if (o !== d) o.open = false; });
     }, true);
   });
+
+  /* 절차 스테퍼: 스크롤 리빌, 활성 노드(호버·스와이프), 모바일 진행 점 */
+  document.documentElement.classList.add('js');
+  var steps = Array.prototype.slice.call(document.querySelectorAll('.procedure .pstep'));
+  if (steps.length) {
+    function setActive(idx) {
+      steps.forEach(function (s, k) { s.classList.toggle('is-active', k === idx); });
+      dots.forEach(function (d, k) { d.classList.toggle('on', k === idx); });
+    }
+    var dots = Array.prototype.slice.call(document.querySelectorAll('.pstep-dots i'));
+    if ('IntersectionObserver' in window) {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (en) {
+          if (en.isIntersecting) { en.target.classList.add('is-in'); io.unobserve(en.target); }
+        });
+      }, { rootMargin: '0px 0px -12% 0px', threshold: 0.2 });
+      steps.forEach(function (s) { io.observe(s); });
+    } else {
+      steps.forEach(function (s) { s.classList.add('is-in'); });
+    }
+    if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+      steps.forEach(function (s, k) { s.addEventListener('mouseenter', function () { setActive(k); }); });
+    }
+    var track = document.querySelector('.procedure');
+    if (track) {
+      var tick = false;
+      track.addEventListener('scroll', function () {
+        if (tick) return; tick = true;
+        requestAnimationFrame(function () {
+          tick = false;
+          var w = steps[0].getBoundingClientRect().width + 14;
+          setActive(Math.min(steps.length - 1, Math.max(0, Math.round(track.scrollLeft / w))));
+        });
+      }, { passive: true });
+    }
+  }
 })();
