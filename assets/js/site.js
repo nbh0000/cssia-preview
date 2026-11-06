@@ -76,12 +76,19 @@
       cur = idx;
       steps.forEach(function (s, k) { s.classList.toggle('is-active', k === idx); s.classList.toggle('is-done', k < idx); });
       dots.forEach(function (d, k) { d.classList.toggle('on', k === idx); });
-      if (scroll && track && track.scrollWidth > track.clientWidth + 8) {
+      if (scroll && track && scrollable()) {
         var w = steps[0].getBoundingClientRect().width + 14;
         track.scrollTo({ left: idx * w, behavior: reduceMotion ? 'auto' : 'smooth' });
       }
     }
-    function advance() { if (Date.now() < pauseUntil) return; setActive((cur + 1) % steps.length, true); }
+    function scrollable() { return track.scrollWidth > track.clientWidth + 8; }
+    function advance() {
+      if (Date.now() < pauseUntil || scrollable()) return;
+      if (cur === steps.length - 1) {
+        track.classList.add('is-rewind'); setActive(0, false);
+        setTimeout(function () { track.classList.remove('is-rewind'); }, 800);
+      } else { setActive(cur + 1, false); }
+    }
     function startAuto() { if (autoTimer || reduceMotion) return; track.classList.add('is-running'); autoTimer = setInterval(advance, 3000); }
     function stopAuto() { if (autoTimer) { clearInterval(autoTimer); autoTimer = null; } track.classList.remove('is-running'); }
     if ('IntersectionObserver' in window) {
@@ -99,10 +106,11 @@
       startAuto();
     }
     if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
-      steps.forEach(function (s, k) { s.addEventListener('mouseenter', function () { pauseUntil = Date.now() + 6000; setActive(k, false); }); });
-      track.addEventListener('mouseleave', function () { pauseUntil = Date.now() + 1200; });
+      /* 마우스가 올라와 있는 동안은 읽는 중 → 진행만 멈춘다(단계는 바꾸지 않음) */
+      track.addEventListener('mouseenter', function () { pauseUntil = Infinity; });
+      track.addEventListener('mouseleave', function () { pauseUntil = Date.now() + 500; });
     }
-    ['touchstart', 'pointerdown', 'wheel'].forEach(function (ev) {
+    ['touchstart', 'pointerdown'].forEach(function (ev) {
       track.addEventListener(ev, function () { pauseUntil = Date.now() + 8000; }, { passive: true });
     });
     var tick = false;
