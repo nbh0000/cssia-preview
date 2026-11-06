@@ -172,6 +172,22 @@
       el.classList.add(cls); fxEls.push(el);
     });
   });
+  /* 색수차 글리치: 제목 안에 빨강·청록 복제 레이어를 만들어 두고(마크업 동일 → 줄바꿈 동일) 재생할 때만 보인다 */
+  function prepGlitch(el) {
+    if (el.dataset.glitch) return; el.dataset.glitch = '1';
+    el.classList.add('glitch-host');
+    var html = el.innerHTML;
+    ['glitch-r', 'glitch-b'].forEach(function (cls) {
+      ['b1', 'b2', 'b3'].forEach(function (band) {
+        var sp = document.createElement('span'); sp.className = 'glitch-copy ' + cls + ' ' + band; sp.setAttribute('aria-hidden', 'true'); sp.innerHTML = html; el.appendChild(sp);
+      });
+    });
+    el.addEventListener('animationend', function (e) { if (e.target === el) el.classList.remove('is-glitching'); });
+  }
+  function playGlitch(el) {
+    if (reduce) return; prepGlitch(el);
+    el.classList.remove('is-glitching'); void el.offsetWidth; el.classList.add('is-glitching');
+  }
   var GLYPHS = '01!#%&?@ABCDEF<>/\\|ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊ';
   var decodeJobs = [], decodeRaf = 0;
   function decodeTick(now) {
@@ -211,6 +227,7 @@
           if (!el.classList.contains('fx-in')) {
             el.classList.add('fx-in');
             if (el.classList.contains('fx-decode')) decode(el);
+            if (el.classList.contains('fx-glitch')) playGlitch(el);
           }
         });
       }, { rootMargin: '0px 0px -10% 0px', threshold: [0.12, 0.5] });
@@ -231,8 +248,13 @@
     }
   }
   /* 히어로 강조 문구: 로드 직후 한 번 디코드 */
-  var heroEm = document.querySelector('.hero h1 em');
-  if (heroEm && !reduce) { heroEm.addEventListener('animationend', function () { heroEm.classList.remove('fx-glitch-once'); }); setTimeout(function () { heroEm.classList.add('fx-glitch-once'); }, 400); }
+  var heroH1 = document.querySelector('.hero h1');
+  if (heroH1 && !reduce) { setTimeout(function () { playGlitch(heroH1); }, 500); }
+  /* 히어로 흐름 칩 순차 점등 순번 */
+  Array.prototype.forEach.call(document.querySelectorAll('.hero-flow li'), function (li, k) { li.style.setProperty('--k', k); });
+  /* 이미지 스캔라인 이동 거리 = 컨테이너 높이 */
+  function sizeFx() { fxEls.forEach(function (el) { if (el.classList.contains('fx-img') && el.tagName !== 'IMG') el.style.setProperty('--fxh', el.getBoundingClientRect().height + 'px'); }); }
+  sizeFx(); window.addEventListener('resize', function () { clearTimeout(sizeFx._t); sizeFx._t = setTimeout(sizeFx, 150); }, { passive: true });
 })();
 
 /* 표 가로 스크롤 끝 페이드: 더 볼 내용이 있을 때만 오른쪽에 페이드 표시 */
