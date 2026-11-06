@@ -70,6 +70,8 @@
     var track = document.querySelector('.procedure');
     var cur = 0, pauseUntil = 0, autoTimer = null;
     var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    function sizeTravel() { steps.forEach(function (li) { li.style.setProperty('--pstep-travel', li.offsetWidth + 'px'); }); }
+    sizeTravel(); window.addEventListener('resize', sizeTravel, { passive: true });
     function setActive(idx, scroll) {
       cur = idx;
       steps.forEach(function (s, k) { s.classList.toggle('is-active', k === idx); s.classList.toggle('is-done', k < idx); });
@@ -132,7 +134,7 @@
       var max = (document.documentElement.scrollHeight - window.innerHeight) || 1;
       bar.style.transform = 'scaleX(' + Math.min(1, y / max) + ')';
       if (header) header.classList.toggle('is-scrolled', y > 24);
-      if (!nativeTimeline && !reduceM) {
+      if (!nativeTimeline && !reduceM && window.innerWidth >= 768) {
         var vh = window.innerHeight;
         bgs.forEach(function (img) {
           var r = img.parentElement.getBoundingClientRect();
@@ -173,6 +175,7 @@
   var GLYPHS = '01!#%&?@ABCDEF<>/\\|ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊ';
   function decode(el) {
     if (reduce || el.dataset.decoded) return; el.dataset.decoded = '1';
+    if (el.dataset.orig) el.textContent = el.dataset.orig; else el.dataset.orig = el.textContent;
     var txt = el.textContent, len = txt.length, t = 0, total = 14;
     if (!len || len > 40) return;
     var w = el.getBoundingClientRect().width; el.style.minWidth = w + 'px';
@@ -191,12 +194,19 @@
     if ('IntersectionObserver' in window && !reduce) {
       var fxio = new IntersectionObserver(function (entries) {
         entries.forEach(function (en) {
-          if (!en.isIntersecting) return;
-          en.target.classList.add('fx-in');
-          if (en.target.classList.contains('fx-decode')) decode(en.target);
-          fxio.unobserve(en.target);
+          var el = en.target;
+          if (en.isIntersecting && (en.intersectionRatio >= 0.12 || en.intersectionRect.height > en.rootBounds.height * 0.5)) {
+            if (!el.classList.contains('fx-in')) {
+              el.classList.add('fx-in');
+              if (el.classList.contains('fx-decode')) decode(el);
+            }
+          } else if (!en.isIntersecting && el.classList.contains('fx-in')) {
+            /* 화면 밖으로 완전히 나가면 초기화 → 다시 올라와도 효과가 다시 재생된다 */
+            el.classList.remove('fx-in');
+            if (el.dataset.decoded) delete el.dataset.decoded;
+          }
         });
-      }, { rootMargin: '0px 0px -8% 0px', threshold: 0.15 });
+      }, { rootMargin: '0px', threshold: [0, 0.12, 0.5] });
       fxEls.forEach(function (el) { fxio.observe(el); });
     } else {
       fxEls.forEach(function (el) { el.classList.add('fx-in'); });
