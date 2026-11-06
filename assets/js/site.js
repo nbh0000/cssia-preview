@@ -82,8 +82,8 @@
       }
     }
     function advance() { if (Date.now() < pauseUntil) return; setActive((cur + 1) % steps.length, true); }
-    function startAuto() { if (autoTimer || reduceMotion) return; autoTimer = setInterval(advance, 2600); }
-    function stopAuto() { if (autoTimer) { clearInterval(autoTimer); autoTimer = null; } }
+    function startAuto() { if (autoTimer || reduceMotion) return; track.classList.add('is-running'); autoTimer = setInterval(advance, 3000); }
+    function stopAuto() { if (autoTimer) { clearInterval(autoTimer); autoTimer = null; } track.classList.remove('is-running'); }
     if ('IntersectionObserver' in window) {
       var io = new IntersectionObserver(function (entries) {
         entries.forEach(function (en) {
@@ -140,7 +140,7 @@
           var r = img.parentElement.getBoundingClientRect();
           if (r.bottom < 0 || r.top > vh) return;
           var t = (r.top + r.height / 2 - vh / 2) / (vh + r.height);   /* -0.5 ~ 0.5 */
-          img.style.transform = 'translateY(' + (t * -12).toFixed(2) + '%) scale(1.12)';
+          img.style.transform = 'translateY(' + (t * -8).toFixed(2) + '%) scale(1.06)';
         });
       }
       lastY = y;
@@ -173,41 +173,59 @@
     });
   });
   var GLYPHS = '01!#%&?@ABCDEF<>/\\|ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊ';
+  var decodeJobs = [], decodeRaf = 0;
+  function decodeTick(now) {
+    decodeRaf = 0;
+    decodeJobs = decodeJobs.filter(function (jb) {
+      if (now - jb.last < 40) return true;
+      jb.last = now; jb.t++;
+      var keep = Math.ceil(jb.len * jb.t / jb.total), out = '';
+      for (var c = 0; c < jb.len; c++) {
+        var ch = jb.txt[c];
+        out += (c < keep || ch === ' ' || ch === '-') ? ch : GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
+      }
+      if (jb.t >= jb.total) { jb.el.textContent = jb.txt; jb.el.style.minWidth = ''; return false; }
+      jb.el.textContent = out; return true;
+    });
+    if (decodeJobs.length) decodeRaf = requestAnimationFrame(decodeTick);
+  }
   function decode(el) {
     if (reduce || el.dataset.decoded) return; el.dataset.decoded = '1';
     if (el.dataset.orig) el.textContent = el.dataset.orig; else el.dataset.orig = el.textContent;
-    var txt = el.textContent, len = txt.length, t = 0, total = 14;
+    var txt = el.textContent, len = txt.length;
     if (!len || len > 40) return;
-    var w = el.getBoundingClientRect().width; el.style.minWidth = w + 'px';
-    var timer = setInterval(function () {
-      t++;
-      var keep = Math.ceil(len * t / total), out = '';
-      for (var c = 0; c < len; c++) {
-        var ch = txt[c];
-        out += (c < keep || ch === ' ' || ch === '-') ? ch : GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
-      }
-      el.textContent = out;
-      if (t >= total) { clearInterval(timer); el.textContent = txt; el.style.minWidth = ''; }
-    }, 36);
+    el.style.minWidth = el.getBoundingClientRect().width + 'px';
+    decodeJobs.push({ el: el, txt: txt, len: len, t: 0, total: 12, last: 0 });
+    if (!decodeRaf) decodeRaf = requestAnimationFrame(decodeTick);
   }
   if (fxEls.length) {
     if ('IntersectionObserver' in window && !reduce) {
-      var fxio = new IntersectionObserver(function (entries) {
+      /* 들어올 때: 화면 아래 10% 안쪽에 들어오면 재생. 나갈 때: 완전히 벗어나고 0.5초 지나면 초기화(가장자리에서 깜빡이지 않게) */
+      var leaveTimers = new WeakMap();
+      var fxin = new IntersectionObserver(function (entries) {
         entries.forEach(function (en) {
           var el = en.target;
-          if (en.isIntersecting && (en.intersectionRatio >= 0.12 || en.intersectionRect.height > en.rootBounds.height * 0.5)) {
-            if (!el.classList.contains('fx-in')) {
-              el.classList.add('fx-in');
-              if (el.classList.contains('fx-decode')) decode(el);
-            }
-          } else if (!en.isIntersecting && el.classList.contains('fx-in')) {
-            /* 화면 밖으로 완전히 나가면 초기화 → 다시 올라와도 효과가 다시 재생된다 */
-            el.classList.remove('fx-in');
-            if (el.dataset.decoded) delete el.dataset.decoded;
+          if (!en.isIntersecting) return;
+          if (en.intersectionRatio < 0.12 && en.intersectionRect.height < en.rootBounds.height * 0.5) return;
+          var tm = leaveTimers.get(el); if (tm) { clearTimeout(tm); leaveTimers.delete(el); }
+          if (!el.classList.contains('fx-in')) {
+            el.classList.add('fx-in');
+            if (el.classList.contains('fx-decode')) decode(el);
           }
         });
-      }, { rootMargin: '0px', threshold: [0, 0.12, 0.5] });
-      fxEls.forEach(function (el) { fxio.observe(el); });
+      }, { rootMargin: '0px 0px -10% 0px', threshold: [0.12, 0.5] });
+      var fxout = new IntersectionObserver(function (entries) {
+        entries.forEach(function (en) {
+          var el = en.target;
+          if (en.isIntersecting) { var tm = leaveTimers.get(el); if (tm) { clearTimeout(tm); leaveTimers.delete(el); } return; }
+          if (!el.classList.contains('fx-in')) return;
+          leaveTimers.set(el, setTimeout(function () {
+            el.classList.remove('fx-in'); leaveTimers.delete(el);
+            if (el.dataset.decoded) delete el.dataset.decoded;
+          }, 500));
+        });
+      }, { rootMargin: '0px', threshold: 0 });
+      fxEls.forEach(function (el) { fxin.observe(el); fxout.observe(el); });
     } else {
       fxEls.forEach(function (el) { el.classList.add('fx-in'); });
     }
